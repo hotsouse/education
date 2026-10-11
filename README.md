@@ -103,3 +103,18 @@ cargo test --workspace --locked
 ## Что считается современным решением
 
 Современность здесь определяется не только номером версии. Решение должно использовать строгие account constraints, проверяемые state transitions, Token-2022 для нового токена, `token_interface` для совместимости, `transfer_checked` для переводов и воспроизводимые LiteSVM-тесты. Если официальные стабильные рекомендации Solana или Anchor изменятся, студент должен зафиксировать выбранные версии и объяснить отклонение в README.
+
+
+## Task 01 — Completed LiteSVM Tests
+
+Implemented 8 integration tests covering Token-2022 mint creation, associated token account creation, minting, transfers, zero amounts, invalid authority, wrong mint, and identical source/destination accounts.
+
+Toolchain: Anchor 1.1.2, Solana CLI 3.1.10, Rust 1.89.0, LiteSVM 0.10.0.
+
+Build: `anchor build --ignore-keys`
+
+Test: `cargo test --workspace --locked`
+
+Expected result: 8 integration tests passed, 1 unit test passed, 0 failed.
+
+Architecture: Anchor account constraints, Token-2022, token_interface and transfer_checked.
