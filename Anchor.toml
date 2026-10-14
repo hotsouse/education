@@ -7,11 +7,13 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-solana_level_1_token_starter = "3pX5NKLru1UBDVckynWQxsgnJeUN3N1viy36Gk9TSn8d"
+solana_level_1_token_starter = "dgTKnP1RW7MuAo8NDcWCRZ1uJu4Jfzmbi4LQQe8q411"
 
 [provider]
-cluster = "Localnet"
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "cargo test"
+
+[hooks]

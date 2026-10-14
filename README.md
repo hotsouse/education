@@ -2,62 +2,6 @@
 
 Учебный starter для итоговых заданий первого уровня курса Superteam KZ. Он показывает современный минимальный каркас токен-программы без привязки к legacy JavaScript SDK.
 
-> Это исходная точка, а не готовое решение. Не работайте напрямую в ветке `main`: для каждого задания создавайте отдельную ветку.
-
-## Как получить проект через GitHub
-
-Если вы ещё не работали с GitHub:
-
-1. Нажмите **Fork** в правом верхнем углу страницы и создайте копию репозитория в своём аккаунте.
-2. На странице своей копии нажмите **Code** и скопируйте HTTPS-ссылку.
-3. Выполните в терминале:
-
-   ```bash
-   git clone <ссылка-на-ваш-fork>
-   cd education
-   git checkout -b task/01-tests
-   ```
-
-4. После выполнения задания сохраните изменения:
-
-   ```bash
-   git add .
-   git commit -m "Complete task 01 tests"
-   git push -u origin task/01-tests
-   ```
-
-5. Отправьте преподавателю ссылку на ветку `task/01-tests` или на последний commit.
-
-Не знаете Git? Для этих заданий достаточно операций `clone`, `checkout -b`, `add`, `commit` и `push`; команды выше можно использовать как готовый сценарий.
-
-## Задание 1 — покрыть токен-программу тестами
-
-В проекте уже есть минимальный LiteSVM-тест `create_token`. Его нужно усилить и добавить тесты остальных реализованных инструкций.
-
-### Что нужно сделать
-
-- В тесте `create_token` проверить `decimals`, mint authority, supply и владельца mint, а не только наличие аккаунта.
-- Покрыть `create_token_account`: проверить владельца token account, mint и token program.
-- Покрыть `mint_tokens`: проверить изменение баланса получателя и общего supply.
-- Покрыть `transfer_tokens`: проверить оба баланса и неизменность общего supply.
-- Добавить негативные сценарии: нулевая сумма, неверный authority, другой mint и одинаковые source/destination.
-- Обновить README в своём fork: указать версии, команды запуска и кратко описать добавленные тесты.
-
-### Готовность задания
-
-Чистый checkout вашей ветки должен проходить:
-
-```bash
-anchor build --ignore-keys
-cargo test --workspace --locked
-```
-
-Флаг `--ignore-keys` нужен только потому, что локальный program keypair намеренно не хранится в учебном репозитории. Для собственного devnet-деплоя создайте keypair локально и синхронизируйте ID командой `anchor keys sync`, но не добавляйте файл keypair в Git.
-
-Не публикуйте keypair, seed phrase, приватные ключи или `.env` с секретами.
-
-Следующие задания выполняются в ветках `task/02-burn` и `task/03-escrow`. Их условия выдаются на учебной платформе; готовой реализации в starter нет.
-
 ## Зафиксированный стек
 
 - Anchor CLI и crates: `1.1.2`
@@ -85,11 +29,12 @@ cargo test --workspace --locked
 ## Быстрый старт
 
 1. Установите версии из раздела «Зафиксированный стек» через AVM, rustup и официальный Solana installer.
-2. Для локального прохождения заданий выполните `anchor build --ignore-keys`. Для собственного devnet-деплоя создайте локальный program keypair и выполните `anchor keys sync`. Не коммитьте keypair или seed phrase.
-3. После первой сборки выполните `cargo test --workspace --locked`.
-4. Разрабатывайте каждое задание в отдельной ветке: `task/01-tests`, `task/02-burn`, `task/03-escrow`.
+2. Создайте собственный локальный program keypair и выполните `anchor keys sync`. Не коммитьте keypair или seed phrase.
+3. Выполните `anchor build`.
+4. Выполните `anchor test` или `cargo test` после сборки программы.
+5. Разрабатывайте каждое задание в отдельной ветке: `task/01-tests`, `task/02-burn`, `task/03-escrow`.
 
-Тест загружает собранный файл `target/deploy/solana_level_1_token_starter.so`, поэтому перед первым `cargo test` нужен `anchor build --ignore-keys`.
+Тест загружает собранный файл `target/deploy/solana_level_1_token_starter.so`, поэтому перед первым `cargo test` нужен `anchor build`.
 
 ## Правила сдачи
 
@@ -103,3 +48,63 @@ cargo test --workspace --locked
 ## Что считается современным решением
 
 Современность здесь определяется не только номером версии. Решение должно использовать строгие account constraints, проверяемые state transitions, Token-2022 для нового токена, `token_interface` для совместимости, `transfer_checked` для переводов и воспроизводимые LiteSVM-тесты. Если официальные стабильные рекомендации Solana или Anchor изменятся, студент должен зафиксировать выбранные версии и объяснить отклонение в README.
+
+## Task 03 — Escrow (Token-2022)
+
+`initialize_escrow(seed, amount)` creates a unique state PDA derived from `["escrow", maker, seed]`, creates a dedicated token vault, records immutable maker/taker/mint/vault/refund/destination addresses, and deposits tokens with `transfer_checked`.
+
+State machine: `Active (0) -> Released (1)` or `Active (0) -> Cancelled (2)`. Terminal states cannot be finalized again. `release_escrow` pays the precommitted taker token account; `cancel_escrow` refunds the precommitted maker token account. Both require the maker's signature, perform checked transfers with PDA signer seeds, and close the empty vault to refund its rent to the maker. The escrow state remains allocated to retain a permanent terminal marker.
+
+### Threat model / security invariants
+
+- Unauthorized callers cannot release or cancel: maker signature and PDA seeds are checked on-chain.
+- Account substitution is blocked by checking the escrow's committed mint, vault and destination/refund account addresses.
+- Cross-escrow vault sharing is prevented by binding the vault pubkey to a unique escrow state PDA; each initialized escrow creates a fresh vault account.
+- Replay and double payout are prevented by terminal status checks and vault closure. The same maker/seed pair cannot be reused while the escrow state exists.
+- Transfers use `token_interface::transfer_checked`, preserving Token-2022 mint and decimal verification.
+- Unsupported transfer-fee / transfer-hook mint extensions may cause instructions to fail; this implementation is intended for standard Token-2022 mints without such extensions. Do not use with confidential or fee-bearing tokens without extension-aware accounting.
+- No secret keys or seed phrases are needed in source control. Keep keypairs and `.env` out of Git.
+
+### Build and test
+
+Run `anchor build`, then `cargo test` using the pinned toolchain. This uploaded starter includes its existing LiteSVM test only; full escrow positive and negative end-to-end LiteSVM coverage must be added and executed before submission. **Do not claim the task is fully verified without these tests.**
+
+## Task 03 escrow validation (Token-2022)
+
+The escrow PDA is derived from `["escrow", maker, seed_le_u64]` and owns a unique
+vault PDA derived from `["vault", escrow]`. The maker deposits via
+`transfer_checked`. Release transfers the committed amount to the taker's
+committed token account; cancellation refunds the maker's committed token
+account. Both close the vault and mark the escrow state finalized. The escrow
+state is intentionally retained as a replay-prevention tombstone, so its rent
+is not refunded.
+
+### State transitions
+
+`Uninitialized -> Active -> Released` or `Uninitialized -> Active -> Cancelled`.
+No transition is permitted out of a terminal state. Both finalization paths
+currently require the maker's signature; this is a maker-controlled escrow,
+not a trustless two-party settlement protocol.
+
+### Threat model and limitations
+
+The program validates PDA derivation, maker signature, token program, mint,
+committed recipient/refund address, active state and exact vault balance.
+It uses Token-2022 interface CPIs with checked decimals. The current version
+assumes ordinary Token-2022 mints without transfer-fee, transfer-hook or other
+extensions that alter transfer semantics. A token account holding unexpected
+extra tokens cannot be finalized until reconciled. Do not use for real funds
+without independent audit and a documented policy for such extensions.
+
+### Tests
+
+From the Anchor workspace root:
+
+```sh
+anchor build
+cargo test
+```
+
+`tests/escrow.rs` exercises LiteSVM release, cancel, token balances, vault
+closure, duplicate finalization, zero amount, duplicate seed, wrong signer,
+and wrong destination. Tests require the built `.so` in `target/deploy`.
