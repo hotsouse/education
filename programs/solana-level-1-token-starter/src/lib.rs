@@ -23,6 +23,10 @@ pub mod solana_level_1_token_starter {
         instructions::mint_tokens::handler(ctx, amount)
     }
 
+    pub fn burn_tokens(ctx: Context<BurnTokens>, amount: u64) -> Result<()> {
+        instructions::burn_tokens::handler(ctx, amount)
+    }
+
     pub fn transfer_tokens(ctx: Context<TransferTokens>, amount: u64) -> Result<()> {
         instructions::transfer_tokens::handler(ctx, amount)
     }

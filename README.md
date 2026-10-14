@@ -2,62 +2,6 @@
 
 Учебный starter для итоговых заданий первого уровня курса Superteam KZ. Он показывает современный минимальный каркас токен-программы без привязки к legacy JavaScript SDK.
 
-> Это исходная точка, а не готовое решение. Не работайте напрямую в ветке `main`: для каждого задания создавайте отдельную ветку.
-
-## Как получить проект через GitHub
-
-Если вы ещё не работали с GitHub:
-
-1. Нажмите **Fork** в правом верхнем углу страницы и создайте копию репозитория в своём аккаунте.
-2. На странице своей копии нажмите **Code** и скопируйте HTTPS-ссылку.
-3. Выполните в терминале:
-
-   ```bash
-   git clone <ссылка-на-ваш-fork>
-   cd education
-   git checkout -b task/01-tests
-   ```
-
-4. После выполнения задания сохраните изменения:
-
-   ```bash
-   git add .
-   git commit -m "Complete task 01 tests"
-   git push -u origin task/01-tests
-   ```
-
-5. Отправьте преподавателю ссылку на ветку `task/01-tests` или на последний commit.
-
-Не знаете Git? Для этих заданий достаточно операций `clone`, `checkout -b`, `add`, `commit` и `push`; команды выше можно использовать как готовый сценарий.
-
-## Задание 1 — покрыть токен-программу тестами
-
-В проекте уже есть минимальный LiteSVM-тест `create_token`. Его нужно усилить и добавить тесты остальных реализованных инструкций.
-
-### Что нужно сделать
-
-- В тесте `create_token` проверить `decimals`, mint authority, supply и владельца mint, а не только наличие аккаунта.
-- Покрыть `create_token_account`: проверить владельца token account, mint и token program.
-- Покрыть `mint_tokens`: проверить изменение баланса получателя и общего supply.
-- Покрыть `transfer_tokens`: проверить оба баланса и неизменность общего supply.
-- Добавить негативные сценарии: нулевая сумма, неверный authority, другой mint и одинаковые source/destination.
-- Обновить README в своём fork: указать версии, команды запуска и кратко описать добавленные тесты.
-
-### Готовность задания
-
-Чистый checkout вашей ветки должен проходить:
-
-```bash
-anchor build --ignore-keys
-cargo test --workspace --locked
-```
-
-Флаг `--ignore-keys` нужен только потому, что локальный program keypair намеренно не хранится в учебном репозитории. Для собственного devnet-деплоя создайте keypair локально и синхронизируйте ID командой `anchor keys sync`, но не добавляйте файл keypair в Git.
-
-Не публикуйте keypair, seed phrase, приватные ключи или `.env` с секретами.
-
-Следующие задания выполняются в ветках `task/02-burn` и `task/03-escrow`. Их условия выдаются на учебной платформе; готовой реализации в starter нет.
-
 ## Зафиксированный стек
 
 - Anchor CLI и crates: `1.1.2`
@@ -85,11 +29,12 @@ cargo test --workspace --locked
 ## Быстрый старт
 
 1. Установите версии из раздела «Зафиксированный стек» через AVM, rustup и официальный Solana installer.
-2. Для локального прохождения заданий выполните `anchor build --ignore-keys`. Для собственного devnet-деплоя создайте локальный program keypair и выполните `anchor keys sync`. Не коммитьте keypair или seed phrase.
-3. После первой сборки выполните `cargo test --workspace --locked`.
-4. Разрабатывайте каждое задание в отдельной ветке: `task/01-tests`, `task/02-burn`, `task/03-escrow`.
+2. Создайте собственный локальный program keypair и выполните `anchor keys sync`. Не коммитьте keypair или seed phrase.
+3. Выполните `anchor build`.
+4. Выполните `anchor test` или `cargo test` после сборки программы.
+5. Разрабатывайте каждое задание в отдельной ветке: `task/01-tests`, `task/02-burn`, `task/03-escrow`.
 
-Тест загружает собранный файл `target/deploy/solana_level_1_token_starter.so`, поэтому перед первым `cargo test` нужен `anchor build --ignore-keys`.
+Тест загружает собранный файл `target/deploy/solana_level_1_token_starter.so`, поэтому перед первым `cargo test` нужен `anchor build`.
 
 ## Правила сдачи
 
@@ -104,17 +49,53 @@ cargo test --workspace --locked
 
 Современность здесь определяется не только номером версии. Решение должно использовать строгие account constraints, проверяемые state transitions, Token-2022 для нового токена, `token_interface` для совместимости, `transfer_checked` для переводов и воспроизводимые LiteSVM-тесты. Если официальные стабильные рекомендации Solana или Anchor изменятся, студент должен зафиксировать выбранные версии и объяснить отклонение в README.
 
+## Task 02 — Safe token burning (`task/02-burn`)
 
-## Task 01 — Completed LiteSVM Tests
+`burn_tokens(amount: u64)` destroys exactly `amount` **base units** of the
+signer's tokens, reducing both the source token-account balance and mint total
+supply. `amount` must be positive. The program uses
+`anchor_spl::token_interface::burn_checked` with `mint.decimals` read from the
+validated on-chain mint (never supplied by the client).
 
-Implemented 8 integration tests covering Token-2022 mint creation, associated token account creation, minting, transfers, zero amounts, invalid authority, wrong mint, and identical source/destination accounts.
+### On-chain account constraints
 
-Toolchain: Anchor 1.1.2, Solana CLI 3.1.10, Rust 1.89.0, LiteSVM 0.10.0.
+| Account | Type | Enforcement |
+|---|---|---|
+| `authority` | `Signer` | Must sign; `token::authority = authority` ties it to the source owner |
+| `mint` | `InterfaceAccount<Mint>` | `mint::token_program = token_program` |
+| `source` | mutable `InterfaceAccount<TokenAccount>` | `token::mint = mint`, `token::authority = authority`, `token::token_program = token_program` |
+| `token_program` | `Interface<TokenInterface>` | Accepts only supported SPL Token / Token-2022 programs; must own both validated token accounts |
 
-Build: `anchor build --ignore-keys`
+Additional explicit guards: `amount > 0` (`AmountMustBePositive`) and
+`source.amount >= amount` (`InsufficientTokenBalance`). The CPI uses
+`BurnChecked`, not unchecked `Burn`. All validation runs on-chain; there is no
+legacy JavaScript client and no critical `UncheckedAccount`.
 
-Test: `cargo test --workspace --locked`
+### Build and test from a clean checkout
 
-Expected result: 8 integration tests passed, 1 unit test passed, 0 failed.
+Install the exact versions specified above, then run from the repository root:
 
-Architecture: Anchor account constraints, Token-2022, token_interface and transfer_checked.
+```bash
+rustc --version        # rustc 1.89.0
+solana --version       # solana-cli 3.1.10
+anchor --version       # anchor-cli 1.1.2
+anchor build
+cargo test
+```
+
+`cargo test` reads `target/deploy/solana_level_1_token_starter.so`, so
+**`anchor build` must run first**. The Rust LiteSVM tests use version `0.10.0`
+and execute locally without a validator, RPC access, or wallet private keys.
+
+`tests/burn_tokens.rs` verifies a successful burn reduces token balance and
+mint supply by the identical amount; zero amount, wrong signer/authority,
+missing signature, wrong mint, insufficient funds, and mismatched token program
+all fail. Each negative case asserts that mint and token-account data and
+lamports remain unchanged. The original `create_token` test remains present.
+
+### Submission and security
+
+Push the changes to `task/02-burn` **after Task 01 is accepted** and submit
+`https://github.com/<your-user>/<your-repo>/tree/task/02-burn` (or a precise
+commit SHA). Do not commit `target/`, `.keys/`, `.env`, private keypairs, seed
+phrases, or wallet JSON files. See `.gitignore` and `SECURITY.md`.

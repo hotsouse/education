@@ -6,4 +6,6 @@ pub enum TokenStarterError {
     AmountMustBePositive,
     #[msg("Source and destination token accounts must be different")]
     SourceEqualsDestination,
+    #[msg("Insufficient token balance to burn the requested amount")]
+    InsufficientTokenBalance,
 }
